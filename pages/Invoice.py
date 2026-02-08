@@ -19,6 +19,7 @@ file = st.file_uploader(
     type=["xlsx"]
 )
 
+# HELPER
 def get_or_create_supplier_product(
     session,
     supplier_name: str,
@@ -129,13 +130,14 @@ with st.form("add_invoice"):
 
 st.divider()
 
-# 📋 TỔNG HỢP + CRUD
+# TỔNG HỢP + CRUD
 st.subheader("📋 Danh sách hoá đơn")
 
 data = (
     session.query(Invoice, Supplier, Product)
-    .join(Supplier)
-    .join(Product)
+    .select_from(Invoice)
+    .join(Supplier, Invoice.supplier_id == Supplier.supplier_id)
+    .join(Product, Invoice.product_id == Product.product_id)
     .order_by(Invoice.invoice_id.desc())
     .all()
 )

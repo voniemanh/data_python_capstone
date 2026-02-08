@@ -52,7 +52,9 @@ class Invoice(Base):
 class Department(Base):
     __tablename__ = "departments"
     department_id = Column(Integer, primary_key=True)
-    department_name = Column(String)
+    department_name = Column(String, unique=True)
+
+    documents = relationship("Document", back_populates="department")
     
 class Document(Base):
     __tablename__ = "documents"
@@ -62,8 +64,7 @@ class Document(Base):
     deadline = Column(Date)
     status = Column(String)
 
-    department = relationship("Department")
-
+    department = relationship("Department", back_populates="documents")
 # ---------- PAGE 3 ----------
 class Todo(Base):
     __tablename__ = "todos"
@@ -73,13 +74,14 @@ class Todo(Base):
     is_done = Column(Boolean, default=False)
 
 # ---------- PAGE 4 ----------
-class Transaction(Base):
+class Personal_Spending(Base):
     __tablename__ = "transactions"
     transaction_id = Column(Integer, primary_key=True)
     amount = Column(Float)
     type = Column(String)  
     category = Column(String)
     transaction_date = Column(Date)
+    monthly_summary = Column(String)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database", "app.db")

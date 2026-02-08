@@ -10,3 +10,8 @@ st.page_link("pages/Invoice.py", label="Quản lý hoá đơn")
 st.page_link("pages/Reminder.py", label="Quản lý văn kiện")
 st.page_link("pages/Todo.py", label="Quản lý công việc")
 st.page_link("pages/Finance.py", label="Quản lý chi tiêu")
+
+st.markdown("""
+---
+Đây là ứng dụng quản lý nội bộ được xây dựng bằng Streamlit và SQLAlchemy.
+""")
