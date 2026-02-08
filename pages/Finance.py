@@ -118,7 +118,7 @@ if not df.empty:
     st.dataframe(df[["Danh mục","Số tiền","Thu","Chi","Ngày hiển thị"]], width='stretch')
 
     # Thêm cột Tháng / Năm
-    df["Tháng"] = df["Ngày"].dt.to_period("M").astype(str)
+    df["Tháng"] = df["Ngày"].dt.strftime("%b-%Y") 
     df["Năm"] = df["Ngày"].dt.year
 
     # Biểu đồ tổng hợp
