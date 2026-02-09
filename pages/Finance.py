@@ -22,9 +22,6 @@ def fetch_data(session):
     
     return df
 
-def format_currency(x):
-    return f"{x:,.0f}"
-
 def plot_monthly(df):
     monthly = df.groupby("Tháng")[["Thu", "Chi"]].sum().reset_index()
     monthly["Tổng"] = monthly["Thu"] - monthly["Chi"]
