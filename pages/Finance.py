@@ -57,11 +57,61 @@ def plot_yearly(df):
     fig.update_layout(yaxis_title="Số tiền (VND)", xaxis=dict(tickformat="d"))
     return fig, yearly
 
+def render_edit_transaction(session, t):
+    sign = "+" if t.type == "Thu nhập" else "-"
+
+    with st.expander(
+        f"{sign}{t.amount:,.0f} 👉 {t.category} 🗓️ {t.transaction_date:%d-%m-%Y}"
+    ):
+        with st.form(key=f"form_{t.transaction_id}"):
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                amount = st.number_input(
+                    "Số tiền",
+                    value=t.amount,
+                    min_value=0.0,
+                    step=1000.0,
+                    format="%0.0f"
+                )
+                type_ = st.selectbox(
+                    "Loại",
+                    ["Thu nhập", "Chi tiêu"],
+                    index=0 if t.type == "Thu nhập" else 1
+                )
+
+            with col2:
+                cat = st.text_input("Danh mục", value=t.category)
+                d = st.date_input("Ngày", value=t.transaction_date)
+
+            with col3:
+                save = st.form_submit_button("💾 Sửa")
+                delete = st.form_submit_button("🗑️ Xoá")
+
+            if save:
+                t.amount = amount
+                t.type = type_
+                t.category = cat
+                t.transaction_date = d
+                session.commit()
+                st.success("✅ Đã cập nhật")
+                st.rerun()
+
+            if delete:
+                session.delete(t)
+                session.commit()
+                st.warning("🗑️ Đã xoá")
+                st.rerun()
+
 # Streamlit App
 st.set_page_config(page_title="💰 Quản lý Chi tiêu", layout="wide")
 st.title("💰 Quản lý Chi tiêu")
 
 session = SessionLocal()
+
+if "edit_limit" not in st.session_state:
+    st.session_state.edit_limit = 10
 
 # Input chi tiêu 
 amount = st.number_input("Số tiền", min_value=0.0, step=1000.0, format="%0.0f")
@@ -83,31 +133,19 @@ st.divider()
 
 # Chỉnh sửa / Xoá chi tiêu
 st.subheader("✏️ Chỉnh sửa / Xoá chi tiêu")
-data = session.query(Personal_Spending).order_by(Personal_Spending.transaction_date.desc()).all()
+
+total_count = session.query(Personal_Spending).count()
+
+data = session.query(Personal_Spending).order_by(Personal_Spending.transaction_date.desc()).limit(st.session_state.edit_limit).all()
 if data:
     for t in data:
-        sign = "+" if t.type == "Thu nhập" else "-"
-        with st.expander(f"{sign}{t.amount:,.0f} 👉{t.category} 🗓️{t.transaction_date.strftime('%d-%m-%Y')}"):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                new_amount = st.number_input("Số tiền", value=t.amount, min_value=0.0, format="%0.0f", key=f"amount_{t.transaction_id}")
-                new_type = st.selectbox("Loại", ["Thu nhập", "Chi tiêu"], index=["Thu nhập", "Chi tiêu"].index(t.type), key=f"type_{t.transaction_id}")
-            with col2:
-                new_category = st.text_input("Danh mục", value=t.category, key=f"cat_{t.transaction_id}")
-                new_date = st.date_input("Ngày", value=t.transaction_date, key=f"date_{t.transaction_id}")
-            with col3:
-                if st.button("💾 Sửa", key=f"edit_{t.transaction_id}"):
-                    t.amount = new_amount
-                    t.type = new_type
-                    t.category = new_category
-                    t.transaction_date = new_date
-                    session.commit()
-                    st.success("✅ Đã cập nhật")
-                if st.button("🗑️ Xoá", key=f"delete_{t.transaction_id}"):
-                    session.delete(t)
-                    session.commit()
-                    st.warning("🗑️ Đã xoá")
-                    st.experimental_rerun()
+        render_edit_transaction(session, t)
+    if st.session_state.edit_limit < total_count:
+        if st.button("➕ Xem thêm"):
+            st.session_state.edit_limit += 10
+            st.rerun()
+else:
+    st.info("Chưa có chi tiêu nào được ghi nhận.")
 
 # DataFrame và hiển thị
 st.subheader("📋 Danh sách chi tiêu")
@@ -115,14 +153,13 @@ df = fetch_data(session)
 if not df.empty:
     df["Ngày"] = pd.to_datetime(df["Ngày"])
     df["Ngày hiển thị"] = df["Ngày"].dt.strftime("%d-%m-%Y")
+    df.index = range(1, len(df) + 1)
     st.dataframe(df[["Danh mục","Số tiền","Thu","Chi","Ngày hiển thị"]], width='stretch')
-
-    # Thêm cột Tháng / Năm
-    df["Tháng"] = df["Ngày"].dt.strftime("%b-%Y") 
-    df["Năm"] = df["Ngày"].dt.year
 
     # Biểu đồ tổng hợp
     st.subheader("📊 Dashboard tổng hợp")
+    df["Tháng"] = df["Ngày"].dt.strftime("%b-%Y") 
+    df["Năm"] = df["Ngày"].dt.year
     fig_month, monthly_summary = plot_monthly(df)
     st.plotly_chart(fig_month, use_container_width=True, config={"displayModeBar": False, "responsive": True})
     
@@ -131,8 +168,9 @@ if not df.empty:
 
 # Xuất Excel
 st.subheader("📥 Xuất dữ liệu chi tiêu")
+export_df = df.drop(columns=["Ngày", "Tháng", "Năm"], errors="ignore")
 output = io.BytesIO()
-df.to_excel(output, index=False)
+export_df.to_excel(output, index=False)
 output.seek(0)
 st.download_button("📤 Xuất toàn bộ chi tiêu", data=output, file_name="chi_tieu.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
