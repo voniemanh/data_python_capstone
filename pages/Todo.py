@@ -63,9 +63,10 @@ else:
         # Checkbox hoàn thành
         with cols[0]:
             done = st.checkbox(
-                "",
+                "Hoàn thành task",
                 value=t.is_done,
-                key=f"check_{t.todo_id}"
+                key=f"check_{t.todo_id}",
+                label_visibility="collapsed"
             )
 
         # Nội dung task
@@ -95,7 +96,7 @@ selected_todo_id = st.selectbox(
     format_func=lambda x: todo_dict[x]
 )
 if selected_todo_id:
-    selected_todo = session.query(Todo).get(selected_todo_id)
+    selected_todo = session.get(Todo, selected_todo_id)
 
     # Xoá task
     if st.button("🗑️ Xoá task"):
