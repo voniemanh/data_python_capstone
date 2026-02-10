@@ -64,6 +64,21 @@ def get_or_create_supplier_product(session, supplier_name, product_name):
 
     return supplier, product
 
+def to_date(value):
+    """Chuyển giá trị invoice_month sang datetime.date"""
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError:
+            # Nếu chỉ là YYYY-MM
+            return datetime.strptime(value + "-01", "%Y-%m-%d").date()
+    elif isinstance(value, pd.Timestamp):
+        return value.date()
+    elif isinstance(value, datetime):
+        return value.date()
+    else:
+        return value  
+
 # IMPORT EXCEL
 st.subheader("📥 Import Excel")
 
@@ -73,7 +88,7 @@ file = st.file_uploader(
 )
 if file:
     df_import = pd.read_excel(file)
-    st.dataframe(df_import, use_container_width=True)
+    st.dataframe(df_import, width='stretch')
 
     if st.button("⚙️ Xử lý hoá đơn"):
         errors = []
@@ -101,10 +116,12 @@ if file:
                     row["Đã trả"]
                 )
 
+                month_date = to_date(row["Tháng"])
+
                 session.add(Invoice(
                     supplier_id=supplier.supplier_id,
                     product_id=product.product_id,
-                    invoice_month=row["Tháng"],
+                    invoice_month=month_date,
                     price=row["Giá"],
                     quantity=row["Số lượng"],
                     total_amount=total,
@@ -137,7 +154,7 @@ with st.form("add_invoice", clear_on_submit=True):
         product_name = st.text_input("Sản phẩm")
 
     with col2:
-        month = st.text_input("Tháng (YYYY-MM)")
+        month = st.date_input("Tháng (YYYY-MM)", value=datetime.today())
         price = st.number_input(
             "Giá",
             min_value=0.0,
@@ -236,9 +253,10 @@ for i, s, p in data:
                 format="%.0f",
                 key=f"paid_{i.invoice_id}"
             )
-            new_month = st.text_input(
-                "Tháng (YYYY-MM)",
-                value=i.invoice_month,
+            new_month_value = to_date(i.invoice_month)
+            new_month = st.date_input(
+                "Tháng (YYYY-MM)", 
+                value=new_month_value, 
                 key=f"month_{i.invoice_id}"
             )
 
@@ -266,7 +284,7 @@ summary = [
     {
         "Nhà cung cấp": s.supplier_name,
         "Sản phẩm": p.product_name,
-        "Tháng": i.invoice_month,
+        "Tháng": to_date(i.invoice_month).strftime('%Y-%m'),
         "Giá": f"{i.price:,.0f}",
         "Số lượng": f"{i.quantity:,}",
         "Tổng tiền": f"{i.total_amount:,.0f}",
@@ -290,7 +308,7 @@ if data:
     df = pd.DataFrame([{
         "Nhà cung cấp": s.supplier_name,
         "Sản phẩm": p.product_name,
-        "Tháng": i.invoice_month,
+        "Tháng": pd.to_datetime(i.invoice_month),
         "Tổng tiền": i.total_amount,
         "Đã trả": i.total_paid,
         "Còn nợ": i.total_debt
@@ -301,7 +319,6 @@ if data:
     c1.metric("💰 Tổng phải chi", f"{df['Tổng tiền'].sum():,.0f}")
     c2.metric("💸 Đã trả", f"{df['Đã trả'].sum():,.0f}")
     c3.metric("🔴 Còn nợ", f"{df['Còn nợ'].sum():,.0f}")
-
 
     # Charts
     # Top nợ theo NCC
@@ -318,8 +335,11 @@ if data:
         df.groupby("Tháng")[["Tổng tiền", "Còn nợ"]]
         .sum()
         .sort_index()
+        .reset_index()
     )
-    st.line_chart(monthly)
+    monthly['Tháng_str'] = monthly['Tháng'].dt.strftime('%Y-%m')
+    monthly = monthly.set_index('Tháng_str')
+    st.line_chart(monthly[["Tổng tiền", "Còn nợ"]])
 
 else:
     st.info("Chưa có dữ liệu")

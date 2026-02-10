@@ -34,9 +34,9 @@ def deadline_label(deadline):
 
 def style_deadline_row(row):
     color_map = {
-        "Quá hạn": "background-color:#ffdddd",
-        "Sắp tới": "background-color:#fff4cc",
-        "Đúng hạn": "background-color:#ddffdd",
+        "Quá hạn": "background-color:#7f1d1d", 
+        "Sắp tới": "background-color:#b35b00", 
+        "Đúng hạn": "background-color:#1f7f1f" 
     }
     bg = color_map[row["Nhãn trạng thái"]]
     return [bg] * len(row)
