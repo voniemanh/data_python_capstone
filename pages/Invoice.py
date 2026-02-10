@@ -304,6 +304,7 @@ if data:
 
 
     # Charts
+    # Top nợ theo NCC
     st.markdown("### 🔥 Top Nhà cung cấp còn nợ")
     debt_by_supplier = (
         df.groupby("Nhà cung cấp")["Còn nợ"]
@@ -311,7 +312,7 @@ if data:
         .sort_values(ascending=False)
     )
     st.bar_chart(debt_by_supplier)
-
+    # Công nợ theo tháng
     st.markdown("### 📈 Công nợ theo tháng")
     monthly = (
         df.groupby("Tháng")[["Tổng tiền", "Còn nợ"]]
