@@ -5,6 +5,7 @@ from models import (
     Supplier, Product, Invoice
 )
 
+# CONFIG
 st.set_page_config(page_title="Hoá đơn NCC", layout="wide")
 st.title("📄 Quản lý Hoá đơn Nhà cung cấp")
 
@@ -19,13 +20,8 @@ file = st.file_uploader(
     type=["xlsx"]
 )
 
-# HELPER
-def get_or_create_supplier_product(
-    session,
-    supplier_name: str,
-    product_name: str
-):
-    # ---- SUPPLIER ----
+# HELPERS
+def get_or_create_supplier_product(session, supplier_name, product_name):
     supplier = session.query(Supplier).filter_by(
         supplier_name=supplier_name
     ).first()
@@ -35,7 +31,6 @@ def get_or_create_supplier_product(
         session.add(supplier)
         session.commit()
 
-    # ---- PRODUCT ----
     product = session.query(Product).filter_by(
         product_name=product_name,
         supplier_id=supplier.supplier_id
@@ -51,13 +46,13 @@ def get_or_create_supplier_product(
 
     return supplier, product
 
+# HANDLE IMPORT
 if file:
     df = pd.read_excel(file)
-    st.dataframe(df)
+    st.dataframe(df, use_container_width=True)
 
     if st.button("⚙️ Xử lý hoá đơn"):
         for _, row in df.iterrows():
-            # Supplier
             supplier, product = get_or_create_supplier_product(
                 session,
                 row["Nhà cung cấp"],
@@ -65,8 +60,9 @@ if file:
             )
 
             total = row["Giá"] * row["Số lượng"]
+            debt = total - row["Đã trả"]
 
-            invoice = Invoice(
+            session.add(Invoice(
                 supplier_id=supplier.supplier_id,
                 product_id=product.product_id,
                 invoice_month=row["Tháng"],
@@ -74,19 +70,16 @@ if file:
                 quantity=row["Số lượng"],
                 total_amount=total,
                 total_paid=row["Đã trả"],
-                total_debt=row["Nợ"]
-            )
-            session.add(invoice)
+                total_debt=debt
+            ))
 
         session.commit()
         st.success("✅ Import thành công")
 
-st.divider()
-
 # INPUT TAY
 st.subheader("➕ Nhập hoá đơn thủ công")
 
-with st.form("add_invoice"):
+with st.form("add_invoice", clear_on_submit=True):
     col1, col2, col3 = st.columns(3)
 
     with col1:
@@ -95,79 +88,113 @@ with st.form("add_invoice"):
 
     with col2:
         month = st.text_input("Tháng (YYYY-MM)")
-        price = st.number_input("Giá", min_value=0.0)
+        price = st.number_input(
+            "Giá",
+            value=0.0,
+            min_value=0.0,
+            step=1000.0,
+            format="%.0f"
+        )
 
     with col3:
-        quantity = st.number_input("Số lượng", min_value=1, step=1)
-        paid = st.number_input("Đã trả", min_value=0.0)
-        debt = st.number_input("Nợ", min_value=0.0)
+        quantity = st.number_input(
+            "Số lượng",
+            value=1,
+            min_value=1,
+            step=1
+        )
+        paid = st.number_input(
+            "Đã trả",
+            value=0.0,
+            min_value=0.0,
+            step=1000.0,
+            format="%.0f"
+        )
 
+    # AUTO CALC
+    total = price * quantity
+    debt = total - paid
     submit = st.form_submit_button("💾 Lưu")
 
-    if submit:
-        supplier, product = get_or_create_supplier_product(
-            session,
-            supplier_name,
-            product_name
-        )
+if submit:
+    supplier, product = get_or_create_supplier_product(
+        session,
+        supplier_name,
+        product_name
+    )
 
-        total = price * quantity
+    session.add(Invoice(
+        supplier_id=supplier.supplier_id,
+        product_id=product.product_id,
+        invoice_month=month,
+        price=price,
+        quantity=quantity,
+        total_amount=total,
+        total_paid=paid,
+        total_debt=debt
+    ))
+    session.commit()
 
-        invoice = Invoice(
-            supplier_id=supplier.supplier_id,
-            product_id=product.product_id,
-            invoice_month=month,
-            price=price,
-            quantity=quantity,
-            total_amount=total,
-            total_paid=paid,
-            total_debt=debt
-        )
-        session.add(invoice)
-        session.commit()
+    st.success("✅ Đã thêm hoá đơn")
 
-        st.success("✅ Đã thêm hoá đơn")
-
-st.divider()
-
-# TỔNG HỢP + CRUD
+# LIST + CRUD
 st.subheader("📋 Danh sách hoá đơn")
 
 data = (
     session.query(Invoice, Supplier, Product)
     .select_from(Invoice)
-    .join(Supplier, Invoice.supplier_id == Supplier.supplier_id)
-    .join(Product, Invoice.product_id == Product.product_id)
+    .join(Supplier)
+    .join(Product)
     .order_by(Invoice.invoice_id.desc())
     .all()
 )
 
 for i, s, p in data:
-    with st.expander(
-        f"🏷️ {s.supplier_name} | {p.product_name} | {i.invoice_month}"
-    ):
+    title = f"🏷️ {s.supplier_name} | {p.product_name} | {i.invoice_month}"
+    if i.total_debt > 0:
+        title = "🔴 " + title
+
+    with st.expander(title):
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.write(f"💰 Tổng: **{i.total_amount:,.0f}**")
-            st.write(f"📦 SL: {i.quantity}")
+            new_price = st.number_input(
+                "Giá",
+                value=float(i.price),
+                step=1000.0,
+                format="%.0f",
+                key=f"amount_{i.invoice_id}"
+            )
+            new_quantity = st.number_input(
+                "Số lượng",
+                value=int(i.quantity),
+                step=1,
+                format="%d",
+                key=f"quantity_{i.invoice_id}"  
+            )
 
         with col2:
             new_paid = st.number_input(
                 "Đã trả",
-                value=i.total_paid,
+                value=float(i.total_paid),
+                step=1000.0,
+                format="%.0f",
                 key=f"paid_{i.invoice_id}"
             )
-            new_debt = st.number_input(
-                "Nợ",
-                value=i.total_debt,
-                key=f"debt_{i.invoice_id}"
+            new_month = st.text_input(
+                "Tháng (YYYY-MM)",
+                value=i.invoice_month,
+                key=f"month_{i.invoice_id}"
             )
 
         with col3:
             if st.button("💾 Sửa", key=f"edit_{i.invoice_id}"):
+                i.quantity = new_quantity
+                i.price = new_price    
+                i.total_amount = new_price * new_quantity
                 i.total_paid = new_paid
-                i.total_debt = new_debt
+                i.total_debt = i.total_amount - new_paid
+                i.invoice_month = new_month
                 session.commit()
                 st.success("✅ Đã cập nhật")
 
@@ -175,6 +202,30 @@ for i, s, p in data:
                 session.delete(i)
                 session.commit()
                 st.warning("🗑️ Đã xoá")
-                st.experimental_rerun()
+                st.rerun()
+
+# SUMMARY TABLE
+st.subheader("📊 Tổng hợp hoá đơn")
+
+summary = [
+    {
+        "Nhà cung cấp": s.supplier_name,
+        "Sản phẩm": p.product_name,
+        "Tháng": i.invoice_month,
+        "Giá": f"{i.price:,.0f}",
+        "Số lượng": f"{i.quantity:,}",
+        "Tổng tiền": f"{i.total_amount:,.0f}",
+        "Đã trả": f"{i.total_paid:,.0f}",
+        "Còn nợ": f"{i.total_debt:,.0f}",
+    }
+    for i, s, p in data
+]
+
+if summary:
+    df_summary = pd.DataFrame(summary)
+    df_summary.index = range(1, len(df_summary) + 1)
+    st.dataframe(df_summary, use_container_width=True)
+else:
+    st.info("Chưa có hoá đơn nào.")
 
 session.close()
