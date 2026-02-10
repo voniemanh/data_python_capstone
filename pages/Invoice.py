@@ -5,6 +5,7 @@ from models import (
     SessionLocal, init_db,
     Supplier, Product, Invoice
 )
+import io
 
 # CONFIG
 st.set_page_config(page_title="Hoá đơn NCC", layout="wide")
@@ -321,5 +322,23 @@ if data:
 
 else:
     st.info("Chưa có dữ liệu")
+
+# Xuất Excel
+st.subheader("📥 Xuất dữ liệu hoá đơn")
+output = io.BytesIO()
+excel_df = pd.DataFrame([{
+    "Nhà cung cấp": s.supplier_name,
+    "Sản phẩm": p.product_name,     
+    "Tháng": i.invoice_month,   
+    "Giá": i.price,
+    "Số lượng": i.quantity,
+    "Tổng tiền": i.total_amount,
+    "Đã trả": i.total_paid,
+    "Còn nợ": i.total_debt
+} for i, s, p in data])
+excel_df.to_excel(output, index=False)
+output.seek(0)
+st.download_button("📤 Xuất toàn bộ hoá đơn", data=output, file_name="hoa_don.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
 
 session.close()
