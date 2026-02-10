@@ -7,6 +7,7 @@ st.title("✅ Todo List")
 
 session = SessionLocal()
 
+# CSS để căn giữa checkbox
 st.markdown(
     """
     <style>
@@ -22,6 +23,13 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# validate task
+def validate_task(task: str):
+    if not task:
+        st.error("❌ Vui lòng nhập task")
+        return False
+    return True
+
 # Thêm task mới
 st.subheader("➕ Thêm việc cần làm")
 with st.form("add_todo"):
@@ -29,13 +37,11 @@ with st.form("add_todo"):
     due_input = st.date_input("Ngày")
     submit = st.form_submit_button("💾 Thêm task")
 
-    if submit:
-        if not task_input:
-            st.error("❌ Vui lòng nhập task")
-        else:
-            session.add(Todo(task=task_input, due_date=due_input))
-            session.commit()
-            st.success("✅ Đã thêm task")
+    if submit and validate_task(task_input):
+        session.add(Todo(task=task_input, due_date=due_input))
+        session.commit()
+        st.success("✅ Đã thêm task")
+
 # Filter
 st.subheader("📅 Lọc theo ngày")
 
@@ -44,7 +50,7 @@ filter_date = st.date_input(
     value=date.today()
 )
 
-# Hiển thị tất cả task
+# Query task 
 todos = (
     session.query(Todo)
     .filter(Todo.due_date == filter_date)
@@ -52,6 +58,7 @@ todos = (
     .all()
 )
 
+# Hiển thị danh sách task
 st.subheader("📋 Danh sách task")
 
 if not todos:
@@ -87,7 +94,7 @@ else:
             st.rerun()
 
 # Xoá/sửa task
-st.subheader("🗑️ Quản lý task")
+st.subheader("🤖 Quản lý task")
 todo_ids = [t.todo_id for t in todos]
 todo_dict = {t.todo_id: t.task for t in todos}  
 selected_todo_id = st.selectbox(
@@ -103,27 +110,22 @@ if selected_todo_id:
         session.delete(selected_todo)
         session.commit()
         st.rerun()
-
     # Sửa task
-    st.markdown("### ✏️ Sửa task")
-    with st.form("edit_todo"):
-        new_task_input = st.text_input(
-            "Việc cần làm",
-            value=selected_todo.task
-        )
-        new_due_input = st.date_input(
-            "Ngày",
-            value=selected_todo.due_date
-        )
-        edit_submit = st.form_submit_button("💾 Lưu thay đổi")
+    st.write("✏️ Sửa task")
+    new_task_input = st.text_input(
+        "Việc cần làm",
+        value=selected_todo.task
+    )
+    new_due_input = st.date_input(
+        "Ngày",
+        value=selected_todo.due_date
+    )
+    edit_submit = st.button("💾 Lưu thay đổi")
 
-        if edit_submit:
-            if not new_task_input:
-                st.error("❌ Vui lòng nhập task")
-            else:
-                selected_todo.task = new_task_input
-                selected_todo.due_date = new_due_input
-                session.commit()
-                st.rerun()
+    if edit_submit and validate_task(new_task_input):
+        selected_todo.task = new_task_input
+        selected_todo.due_date = new_due_input
+        session.commit()
+        st.rerun()
 
 session.close()
