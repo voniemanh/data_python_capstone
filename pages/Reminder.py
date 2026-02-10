@@ -10,6 +10,7 @@ st.title("⏰ Reminder Văn bản")
 init_db()
 session = SessionLocal()
 
+# set session state
 if "edit_limit" not in st.session_state:
     st.session_state.edit_limit = 10
 

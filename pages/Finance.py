@@ -5,6 +5,11 @@ from datetime import date
 from models import SessionLocal, Personal_Spending
 import io
 
+st.set_page_config(page_title="💰 Quản lý Chi tiêu", layout="wide")
+st.title("💰 Quản lý Chi tiêu")
+
+session = SessionLocal()
+
 # Helpers
 def fetch_data(session):
     data = session.query(Personal_Spending).order_by(Personal_Spending.transaction_date.desc()).all()
@@ -101,17 +106,11 @@ def render_edit_transaction(session, t):
                 st.warning("🗑️ Đã xoá")
                 st.rerun()
 
-# Streamlit App
-st.set_page_config(page_title="💰 Quản lý Chi tiêu", layout="wide")
-st.title("💰 Quản lý Chi tiêu")
-
-session = SessionLocal()
-
 # Set view limit
 if "edit_limit" not in st.session_state:
     st.session_state.edit_limit = 10
 
-# Input chi tiêu 
+# Nhập chi tiêu mới
 amount = st.number_input("Số tiền", min_value=0.0, step=1000.0, format="%0.0f")
 type_ = st.selectbox("Loại", ["Thu nhập", "Chi tiêu"])
 cat = st.text_input("Danh mục")
@@ -159,10 +158,10 @@ if not df.empty:
     df["Tháng"] = df["Ngày"].dt.strftime("%b-%Y") 
     df["Năm"] = df["Ngày"].dt.year
     fig_month, monthly_summary = plot_monthly(df)
-    st.plotly_chart(fig_month, use_container_width=True, config={"displayModeBar": False, "responsive": True})
+    st.plotly_chart(fig_month, use_container_width=True)
     
     fig_year, yearly_summary = plot_yearly(df)
-    st.plotly_chart(fig_year, use_container_width=True, config={"displayModeBar": False, "responsive": True})
+    st.plotly_chart(fig_year, use_container_width=True)
 
 # Xuất Excel
 st.subheader("📥 Xuất dữ liệu chi tiêu")
