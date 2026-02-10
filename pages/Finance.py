@@ -107,6 +107,7 @@ st.title("💰 Quản lý Chi tiêu")
 
 session = SessionLocal()
 
+# Set view limit
 if "edit_limit" not in st.session_state:
     st.session_state.edit_limit = 10
 
