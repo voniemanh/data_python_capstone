@@ -1,11 +1,11 @@
 import os
 from sqlalchemy import (
     Column, Integer, String, Float, Date, Boolean,
-    ForeignKey, create_engine
+    ForeignKey, Text, create_engine, DateTime
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy import create_engine
-from datetime import date
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -81,6 +81,15 @@ class Personal_Spending(Base):
     category = Column(String)
     transaction_date = Column(Date)
     monthly_summary = Column(String)
+    
+# chatbot
+class ChatHistory(Base):
+    __tablename__ = "chat_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question = Column(Text)
+    answer = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "database", "app.db")

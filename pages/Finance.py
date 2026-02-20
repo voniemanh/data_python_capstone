@@ -1,14 +1,21 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import date
-from models import SessionLocal, Personal_Spending
+from datetime import datetime
+from models import SessionLocal, Personal_Spending, ChatHistory
 import io
+from openai import OpenAI
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 st.set_page_config(page_title="💰 Quản lý Chi tiêu", layout="wide")
 st.title("💰 Quản lý Chi tiêu")
 
 session = SessionLocal()
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Helpers
 def fetch_data(session):
@@ -106,6 +113,33 @@ def render_edit_transaction(session, t):
                 st.warning("🗑️ Đã xoá")
                 st.rerun()
 
+def build_financial_context(df):
+    monthly = df.groupby("Tháng")[["Thu", "Chi"]].sum()
+    yearly = df.groupby("Năm")[["Thu", "Chi"]].sum()
+    category = df.groupby("Danh mục")[["Thu", "Chi"]].sum()
+
+    total_income = df["Thu"].sum()
+    total_expense = df["Chi"].sum()
+
+    saving_rate = 0
+    if total_income > 0:
+        saving_rate = (total_income - total_expense) / total_income * 100
+
+    return f"""
+Tổng thu: {total_income:,.0f}
+Tổng chi: {total_expense:,.0f}
+Tỉ lệ tiết kiệm: {saving_rate:.2f}%
+
+Theo tháng:
+{monthly.to_string()}
+
+Theo năm:
+{yearly.to_string()}
+
+Theo danh mục:
+{category.to_string()}
+"""
+
 # Set view limit
 if "edit_limit" not in st.session_state:
     st.session_state.edit_limit = 10
@@ -165,10 +199,69 @@ if not df.empty:
 
 # Xuất Excel
 st.subheader("📥 Xuất dữ liệu chi tiêu")
-export_df = df.drop(columns=["Ngày", "Tháng", "Năm"], errors="ignore")
+export_df = df.drop(columns=["Ngày", "Tháng", "Năm", "Thu", "Chi"], errors="ignore")
 output = io.BytesIO()
 export_df.to_excel(output, index=False)
 output.seek(0)
 st.download_button("📤 Xuất toàn bộ chi tiêu", data=output, file_name="chi_tieu.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+# Chatbot AI
+st.subheader("🤖 Trợ lý tài chính AI")
+question = st.text_input("Hỏi về chi tiêu của bạn")
+
+if st.button("💬 Hỏi AI"):
+    if not df.empty and question:
+
+        context = build_financial_context(df)
+
+        messages = [
+            {
+                "role": "system",
+                "content": """
+Bạn là chuyên gia tư vấn tài chính cá nhân 10 năm kinh nghiệm.
+Phân tích dữ liệu logic.
+Chỉ ra điểm mạnh, điểm yếu.
+Đưa ra lời khuyên cụ thể.
+Không nói chung chung.
+"""
+            },
+            {
+                "role": "user",
+                "content": f"""
+Dữ liệu tài chính:
+{context}
+
+Câu hỏi:
+{question}
+"""
+            }
+        ]
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages
+        )
+
+        answer = response.choices[0].message.content
+        st.success(answer)
+
+        session.add(ChatHistory(
+            question=question,
+            answer=answer
+        ))
+        session.commit()
+
+# CHAT HISTORY
+st.subheader("📜 Lịch sử hỏi đáp")
+
+history = session.query(ChatHistory)\
+    .order_by(ChatHistory.created_at.desc())\
+    .limit(10)\
+    .all()
+
+for h in history:
+    st.markdown(f"**🧑 Bạn:** {h.question}")
+    st.markdown(f"**🤖 AI:** {h.answer}")
+    st.divider()
 
 session.close()
