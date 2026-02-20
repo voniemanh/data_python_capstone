@@ -1,4 +1,3 @@
-# models.py
 import os
 from sqlalchemy import (
     Column, Integer, String, Float, Date, Boolean,
