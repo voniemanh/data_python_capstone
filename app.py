@@ -14,5 +14,4 @@ st.page_link("pages/Finance.py", label="Quản lý chi tiêu")
 st.markdown("""
 ---
 Đây là ứng dụng làm bài tập cá nhân được xây dựng bằng Streamlit và SQLAlchemy.
-Đừng đưa thông tin cá nhân hoặc nhạy cảm vào ứng dụng này.
 """)
