@@ -3,3 +3,5 @@ pandas
 plotly
 sqlalchemy 
 openpyxl
+python-dotenv
+openai
